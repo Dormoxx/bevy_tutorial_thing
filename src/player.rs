@@ -1,20 +1,34 @@
 use crate::ascii::{spawn_ascii_sprite, AsciiSheet};
+use crate::fadeout::create_fadeout;
 use crate::simple_tilemap::{EncounterSpawner, SimpleTileCollider};
 use crate::{GameState, GLOBAL_SIZE};
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb::collide;
 use bevy_inspector_egui::Inspectable;
 use iyes_loopless::prelude::*;
-use iyes_loopless::state::NextState;
 
 #[derive(Component, Inspectable)]
 pub struct Player {
     speed: f32,
+    active: bool,
+    just_moved: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, StageLabel)]
+struct EncounterFixedUpdate;
+
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub struct EncounterTracker {
+    timer: Timer,
 }
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
+        // let mut encounter_stage = SystemStage::parallel();
+        // encounter_stage.add_system(encounter_check.run_in_state(GameState::Overworld));
+
         app.add_system(
             player_move
                 .run_in_state(GameState::Overworld)
@@ -30,9 +44,13 @@ impl Plugin for PlayerPlugin {
                 .run_in_state(GameState::Overworld)
                 .after("player_move"),
         )
+        // .add_stage_before(
+        //     CoreStage::Update,
+        //     EncounterFixedUpdate,
+        //     FixedTimestepStage::new(Duration::from_secs_f32(1.0)).with_stage(encounter_stage),
+        // )
         .add_enter_system(GameState::Overworld, show_player)
         .add_exit_system(GameState::Overworld, hide_player)
-        .add_system(test_exit_combat.run_in_state(GameState::Overworld))
         .add_startup_system(spawn_player);
     }
 }
@@ -57,19 +75,31 @@ fn spawn_player(mut commands: Commands, sheet: Res<AsciiSheet>) {
     commands
         .entity(player)
         .insert(Name::new("Player"))
-        .insert(Player { speed: 3.0 });
+        .insert(Player {
+            speed: 3.0,
+            active: true,
+            just_moved: false,
+        })
+        .insert(EncounterTracker {
+            timer: Timer::from_seconds(1.0, true),
+        });
 
     commands.entity(player).push_children(&[bg]);
 }
 
 fn player_move(
-    mut player_q: Query<(&Player, &mut Transform)>,
+    mut player_q: Query<(&mut Player, &mut Transform)>,
     wall_q: Query<&Transform, (With<SimpleTileCollider>, Without<Player>)>,
     keyboard: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
-    let (player, mut transform) = player_q.single_mut();
+    let (mut player, mut transform) = player_q.single_mut();
     let speed = player.speed * time.delta_seconds() * GLOBAL_SIZE;
+    player.just_moved = false;
+
+    if !player.active {
+        return;
+    }
 
     let mut y_delta = 0.;
     if keyboard.pressed(KeyCode::W) || keyboard.pressed(KeyCode::Up) {
@@ -91,6 +121,9 @@ fn player_move(
         .iter()
         .any(|&transform| wall_collision_check(target, transform.translation))
     {
+        if x_delta != 0. {
+            player.just_moved = true;
+        }
         transform.translation = target;
     }
     let target = transform.translation + Vec3::new(0., y_delta, 0.);
@@ -98,6 +131,9 @@ fn player_move(
         .iter()
         .any(|&transform| wall_collision_check(target, transform.translation))
     {
+        if y_delta != 0. {
+            player.just_moved = true;
+        }
         transform.translation = target;
     }
 }
@@ -113,17 +149,27 @@ fn wall_collision_check(target_player_pos: Vec3, wall_translation: Vec3) -> bool
 }
 
 fn encounter_check(
-    player_q: Query<&Transform, With<Player>>,
-    encounter_q: Query<&Transform, (With<EncounterSpawner>, Without<Player>)>,
     mut commands: Commands,
+    mut player_q: Query<(&mut Player, &mut EncounterTracker, &Transform)>,
+    encounter_q: Query<&Transform, (With<EncounterSpawner>, Without<Player>)>,
+    ascii: Res<AsciiSheet>,
+    time: Res<Time>,
 ) {
-    let player_translation = player_q.single().translation;
-    if encounter_q
-        .iter()
-        .any(|&transform| wall_collision_check(player_translation, transform.translation))
+    let (mut player, mut encounter_tracker, player_transform) = player_q.single_mut();
+    let player_translation = player_transform.translation;
+    if player.just_moved
+        && encounter_q
+            .iter()
+            .any(|&transform| wall_collision_check(player_translation, transform.translation))
     {
-        println!("chaging to combat!");
-        commands.insert_resource(NextState(GameState::Combat));
+        encounter_tracker.timer.tick(time.delta());
+
+        if encounter_tracker.timer.just_finished() {
+            println!("changing to combat!");
+            player.active = false;
+            create_fadeout(&mut commands, Some(GameState::Combat), &ascii);
+            //commands.insert_resource(NextState(GameState::Combat));
+        }
     }
 }
 
@@ -139,11 +185,12 @@ fn camera_follow(
 }
 
 fn show_player(
-    mut player_q: Query<&mut Visibility, With<Player>>,
+    mut player_q: Query<(&mut Player, &mut Visibility)>,
     children_q: Query<&Children, With<Player>>,
     mut child_visible_q: Query<&mut Visibility, Without<Player>>,
 ) {
-    let mut player_vis = player_q.single_mut();
+    let (mut player, mut player_vis) = player_q.single_mut();
+    player.active = true;
     player_vis.is_visible = true;
 
     if let Ok(children) = children_q.get_single() {
@@ -169,11 +216,5 @@ fn hide_player(
                 child_vis.is_visible = false;
             }
         }
-    }
-}
-
-fn test_exit_combat(keyboard: Res<Input<KeyCode>>, mut commands: Commands) {
-    if keyboard.pressed(KeyCode::Space) {
-        commands.insert_resource(NextState(GameState::Overworld));
     }
 }

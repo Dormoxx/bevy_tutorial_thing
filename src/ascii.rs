@@ -9,7 +9,7 @@ impl Plugin for AsciiPlugin {
     }
 }
 
-pub struct AsciiSheet(Handle<TextureAtlas>);
+pub struct AsciiSheet(pub Handle<TextureAtlas>);
 
 fn load_ascii(
     mut commands: Commands,

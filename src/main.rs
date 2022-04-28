@@ -10,23 +10,27 @@ pub const GLOBAL_SIZE: f32 = 0.1;
 // struct MyFixedUpdate;
 
 mod ascii;
+mod combat;
 mod debug;
+mod fadeout;
 mod player;
 mod simple_tilemap;
 
 use ascii::AsciiPlugin;
+use combat::CombatPlugin;
 use debug::DebugPlugin;
+use fadeout::FadeoutPlugin;
 use player::PlayerPlugin;
 use simple_tilemap::SimpleTileMapPlugin;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum GameState {
+pub enum GameState {
     Overworld,
     Combat,
 }
 
 fn main() {
-    let height = 900.0;
+    let height = 640.0;
     let window_params = WindowDescriptor {
         width: height * RESOLUTION,
         height,
@@ -35,27 +39,26 @@ fn main() {
         ..Default::default()
     };
 
-    // let mut test_stage = SystemStage::parallel();
-    // test_stage.add_system(test_system);
-
     App::new()
         .insert_resource(window_params)
         .add_plugins(DefaultPlugins)
         .add_loopless_state(GameState::Overworld)
-        .add_loopless_state(GameState::Combat)
         .add_plugin(AsciiPlugin)
         .add_startup_system(spawn_camera)
         .add_plugin(PlayerPlugin)
         .add_startup_system(hot_reload)
         .add_plugin(DebugPlugin)
         .add_plugin(SimpleTileMapPlugin)
-        //.add_stage_before(CoreStage::Update, MyFixedUpdate, FixedTimestepStage::new(Duration::from_micros(16660)).with_stage(test_stage))
+        .add_plugin(CombatPlugin)
+        .add_plugin(FadeoutPlugin)
         .run();
 }
 
 fn spawn_camera(mut commands: Commands) {
     let mut camera = OrthographicCameraBundle::new_2d();
 
+    camera.orthographic_projection.top = 1.;
+    camera.orthographic_projection.bottom = -1.;
     camera.orthographic_projection.left = -1. * RESOLUTION;
     camera.orthographic_projection.right = 1. * RESOLUTION;
     camera.orthographic_projection.scaling_mode = ScalingMode::None;

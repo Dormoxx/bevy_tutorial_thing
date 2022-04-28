@@ -1,8 +1,9 @@
 use crate::{
     ascii::{spawn_ascii_sprite, AsciiSheet},
-    GLOBAL_SIZE,
+    GameState, GLOBAL_SIZE,
 };
 use bevy::prelude::*;
+use iyes_loopless::prelude::*;
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -14,11 +15,16 @@ pub struct SimpleTileMapPlugin;
 pub struct SimpleTileCollider;
 
 #[derive(Component)]
-pub struct EncounterSpawner;
+pub struct EncounterSpawner; //tile label/tag
+
+#[derive(Component)]
+struct Map;
 
 impl Plugin for SimpleTileMapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(create_map);
+        app.add_startup_system(create_map)
+            .add_enter_system(GameState::Overworld, show_map)
+            .add_exit_system(GameState::Overworld, hide_map);
     }
 }
 
@@ -48,8 +54,35 @@ fn create_map(mut commands: Commands, sheet: Res<AsciiSheet>) {
     }
     commands
         .spawn()
+        .insert(Map)
         .insert(Name::new("Map"))
         .insert(Transform::default())
         .insert(GlobalTransform::default())
         .push_children(&tiles);
+}
+
+fn show_map(
+    children_q: Query<&Children, With<Map>>,
+    mut child_visible_q: Query<&mut Visibility, Without<Map>>,
+) {
+    if let Ok(children) = children_q.get_single() {
+        for child in children.iter() {
+            if let Ok(mut child_vis) = child_visible_q.get_mut(*child) {
+                child_vis.is_visible = true;
+            }
+        }
+    }
+}
+
+fn hide_map(
+    children_q: Query<&Children, With<Map>>,
+    mut child_visible_q: Query<&mut Visibility, Without<Map>>,
+) {
+    if let Ok(children) = children_q.get_single() {
+        for child in children.iter() {
+            if let Ok(mut child_vis) = child_visible_q.get_mut(*child) {
+                child_vis.is_visible = false;
+            }
+        }
+    }
 }
