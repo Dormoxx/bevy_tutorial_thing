@@ -1,0 +1,28 @@
+# https://www.youtube.com/watch?v=2OdUm5fMbqg&list=PL6uRoaCCw7GN_lJxpKS3j-KXuThRiSXc6&index=4
+
+[package]
+name = "yt-tutorial"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html 
+#https://bevy-cheatbook.github.io/setup/bevy-config.html
+[dependencies.bevy]
+version = "0.7"
+default-features = true
+features = [
+    "dynamic",
+    #"trace",
+]
+
+[dependencies]
+bevy-inspector-egui = "0.10.0"
+iyes_loopless = {git = "https://github.com/IyesGames/iyes_loopless.git"}
+
+#stopped at https://www.youtube.com/watch?v=uTmp8PiI6aw&list=PLT_D88-MTFOPPl75g4WshL1Gx2bnGTUkz&index=4

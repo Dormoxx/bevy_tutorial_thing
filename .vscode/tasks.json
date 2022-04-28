@@ -1,0 +1,16 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo fmt && run",
+            //"label": "cargo run",
+            "type": "shell",
+            "command": "~/.cargo/bin/cargo fmt && ~/.cargo/bin/cargo run",
+            //"command": "~/.cargo/bin/cargo run",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
